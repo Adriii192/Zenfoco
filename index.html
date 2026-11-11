@@ -64,6 +64,14 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
 .row input[type=checkbox]{width:22px;height:22px}
 .dlg-actions{display:flex;justify-content:flex-end;margin-top:16px}
 #install{display:none;font-size:.9rem;padding:10px 18px}
+.sounds{width:100%;background:var(--card);border-radius:16px;padding:14px 18px}
+.sounds h2{margin:0 0 10px;font-size:1rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:0;border-radius:999px;padding:10px 14px;background:var(--bg);color:var(--text);font-size:.9rem;font-weight:600;cursor:pointer}
+.chip.on{background:var(--accent);color:#fff}
+.vol{display:flex;align-items:center;gap:10px;margin-top:14px}
+.vol input{flex:1;accent-color:var(--accent)}
+.hint{color:var(--muted);font-size:.8rem;margin:10px 0 0}
 </style>
 </head>
 <body>
@@ -100,6 +108,23 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     <div><b id="statMinutes">0</b><span>Minutos</span></div>
     <div><b id="statStreak">0</b><span>Racha (días)</span></div>
   </div>
+
+  <section class="sounds">
+    <h2>🎧 Sonidos de concentración</h2>
+    <div class="chips" id="chips">
+      <button class="chip" data-sound="rain">🌧️ Lluvia</button>
+      <button class="chip" data-sound="sea">🌊 Mar</button>
+      <button class="chip" data-sound="brown">🟤 Ruido marrón</button>
+      <button class="chip" data-sound="pink">🌸 Ruido rosa</button>
+      <button class="chip" data-sound="white">⚪ Ruido blanco</button>
+    </div>
+    <div class="vol">
+      <span aria-hidden="true">🔈</span>
+      <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volumen">
+      <span aria-hidden="true">🔊</span>
+    </div>
+    <p class="hint">Pulsa un sonido para activarlo y vuelve a pulsarlo para apagarlo.</p>
+  </section>
 
   <button class="btn secondary" id="install">📲 Instalar Zenfoco</button>
 </main>
@@ -317,6 +342,112 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
   if ('serviceWorker' in navigator){
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
+
+  // ---------- Sonidos de concentración (generados en el dispositivo) ----------
+  const SOUND_NAMES = { rain:'Lluvia', sea:'Mar', brown:'Ruido marrón', pink:'Ruido rosa', white:'Ruido blanco' };
+  const soundUrls = {};
+  const player = new Audio();
+  player.loop = true;
+  let currentSound = null;
+  let volume = store.get('zf_volume', 0.6);
+
+  function makeWav(kind){
+    const sr = 22050, L = sr * 16, F = sr * 2, N = L + F;
+    const x = new Float32Array(N);
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0, last=0, lp=0, lp2=0, hpY=0, prevLp=0, env=0;
+    for (let i = 0; i < N; i++){
+      const w = Math.random() * 2 - 1;
+      if (kind === 'white'){
+        x[i] = w * 0.5;
+      } else if (kind === 'pink'){
+        b0 = .99886*b0 + w*.0555179; b1 = .99332*b1 + w*.0750759; b2 = .96900*b2 + w*.1538520;
+        b3 = .86650*b3 + w*.3104856; b4 = .55000*b4 + w*.5329522; b5 = -.7616*b5 - w*.0168980;
+        x[i] = (b0+b1+b2+b3+b4+b5+b6 + w*.5362) * 0.11;
+        b6 = w * .115926;
+      } else if (kind === 'brown'){
+        last = (last + 0.02 * w) / 1.02;
+        x[i] = last * 3.5;
+      } else if (kind === 'rain'){
+        lp += 0.6 * (w - lp);
+        hpY = 0.97 * (hpY + lp - prevLp); prevLp = lp;
+        if (Math.random() < 0.0006) env = 0.3 + Math.random() * 0.5;
+        env *= 0.992;
+        x[i] = hpY * 0.5 + env * w * 0.4;
+      } else if (kind === 'sea'){
+        lp += 0.05 * (w - lp);
+        lp2 += 0.35 * (w - lp2);
+        const t = i / sr;
+        const swell = 0.5 + 0.5 * Math.sin(2 * Math.PI * t / 8 - 1.2);
+        const e = 0.25 + 0.75 * swell * swell;
+        x[i] = lp * e * 3.2 + lp2 * e * e * 0.22;
+      }
+    }
+    // Bucle sin cortes: mezclar el final con el principio
+    const out = new Float32Array(L);
+    for (let i = 0; i < L; i++) out[i] = x[i];
+    for (let i = 0; i < F; i++){
+      const a = i / F;
+      out[i] = x[i] * a + x[L + i] * (1 - a);
+    }
+    let peak = 0.0001, sq = 0;
+    for (let i = 0; i < L; i++){ const v = Math.abs(out[i]); if (v > peak) peak = v; sq += out[i] * out[i]; }
+    const rms = Math.sqrt(sq / L) || 0.0001;
+    const scale = Math.min(0.9 / peak, 0.12 / rms);
+    // WAV 16 bit mono
+    const buf = new ArrayBuffer(44 + L * 2);
+    const dv = new DataView(buf);
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    wr(0, 'RIFF'); dv.setUint32(4, 36 + L * 2, true); wr(8, 'WAVE'); wr(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    wr(36, 'data'); dv.setUint32(40, L * 2, true);
+    for (let i = 0; i < L; i++){
+      const v = Math.max(-1, Math.min(1, out[i] * scale));
+      dv.setInt16(44 + i * 2, v * 32767, true);
+    }
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+
+  function renderSounds(){
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.sound === currentSound));
+  }
+
+  function stopSound(){
+    try { player.pause(); } catch(e){}
+    currentSound = null;
+    renderSounds();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  }
+
+  function playSound(kind){
+    if (currentSound === kind){ stopSound(); return; }
+    if (!soundUrls[kind]) soundUrls[kind] = makeWav(kind);
+    player.src = soundUrls[kind];
+    player.volume = volume;
+    player.play().catch(() => {});
+    currentSound = kind;
+    renderSounds();
+    if ('mediaSession' in navigator){
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: SOUND_NAMES[kind], artist: 'Zenfoco',
+          artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }]
+        });
+        navigator.mediaSession.setActionHandler('pause', stopSound);
+        navigator.mediaSession.setActionHandler('stop', stopSound);
+        navigator.mediaSession.playbackState = 'playing';
+      } catch(e){}
+    }
+  }
+
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => playSound(c.dataset.sound)));
+  const volEl = $('vol');
+  volEl.value = volume;
+  volEl.addEventListener('input', () => {
+    volume = parseFloat(volEl.value);
+    player.volume = volume;
+    store.set('zf_volume', volume);
+  });
 
   applyTheme(); render(); renderStats();
 })();
