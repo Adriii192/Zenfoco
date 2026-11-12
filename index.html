@@ -72,6 +72,10 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
 .vol{display:flex;align-items:center;gap:10px;margin-top:14px}
 .vol input{flex:1;accent-color:var(--accent)}
 .hint{color:var(--muted);font-size:.8rem;margin:10px 0 0}
+.mixer{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.mrow{display:grid;grid-template-columns:128px 1fr;align-items:center;gap:10px}
+.mrow label{font-size:.9rem}
+.mrow input{width:100%;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -110,20 +114,10 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
   </div>
 
   <section class="sounds">
-    <h2>🎧 Sonidos de concentración</h2>
-    <div class="chips" id="chips">
-      <button class="chip" data-sound="rain">🌧️ Lluvia</button>
-      <button class="chip" data-sound="sea">🌊 Mar</button>
-      <button class="chip" data-sound="brown">🟤 Ruido marrón</button>
-      <button class="chip" data-sound="pink">🌸 Ruido rosa</button>
-      <button class="chip" data-sound="white">⚪ Ruido blanco</button>
-    </div>
-    <div class="vol">
-      <span aria-hidden="true">🔈</span>
-      <input type="range" id="vol" min="0" max="1" step="0.05" aria-label="Volumen">
-      <span aria-hidden="true">🔊</span>
-    </div>
-    <p class="hint">Pulsa un sonido para activarlo y vuelve a pulsarlo para apagarlo.</p>
+    <h2>🎧 Mezclador de sonidos</h2>
+    <div class="chips" id="presets"></div>
+    <div class="mixer" id="mixer"></div>
+    <p class="hint">Sube varios deslizadores para mezclar sonidos a tu gusto.</p>
   </section>
 
   <button class="btn secondary" id="install">📲 Instalar Zenfoco</button>
@@ -343,20 +337,54 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
-  // ---------- Sonidos de concentración (generados en el dispositivo) ----------
-  const SOUND_NAMES = { rain:'Lluvia', sea:'Mar', brown:'Ruido marrón', pink:'Ruido rosa', white:'Ruido blanco' };
-  const soundUrls = {};
-  const player = new Audio();
-  player.loop = true;
-  let currentSound = null;
-  let volume = store.get('zf_volume', 0.6);
+  // ---------- Mezclador de sonidos (generados en el dispositivo) ----------
+  const SOUNDS = [
+    { id:'rain',     icon:'🌧️', name:'Lluvia' },
+    { id:'storm',    icon:'⛈️', name:'Tormenta' },
+    { id:'river',    icon:'💧', name:'Río' },
+    { id:'sea',      icon:'🌊', name:'Mar' },
+    { id:'forest',   icon:'🌲', name:'Bosque' },
+    { id:'crickets', icon:'🦗', name:'Grillos' },
+    { id:'brown',    icon:'🟤', name:'Ruido marrón' },
+    { id:'pink',     icon:'🌸', name:'Ruido rosa' },
+    { id:'white',    icon:'⚪', name:'Ruido blanco' }
+  ];
+  const PRESETS = [
+    { name:'🎯 Concentración', mix:{ brown:.75, rain:.45 } },
+    { name:'🌿 Naturaleza',    mix:{ river:.65, forest:.7 } },
+    { name:'⛈️ Tormenta',      mix:{ storm:.8, rain:.35 } },
+    { name:'🌙 Noche',         mix:{ crickets:.55, river:.5 } },
+    { name:'🔇 Apagar todo',   mix:{} }
+  ];
+  const SR = 22050;
+  const TARGET_RMS = { white:.12, pink:.12, brown:.12, rain:.12, sea:.12, river:.12, storm:.10, forest:.07, crickets:.05 };
+  const players = {};
+  let mix = {};
+  let mixPaused = false;
 
-  function makeWav(kind){
-    const sr = 22050, L = sr * 16, F = sr * 2, N = L + F;
+  function genSound(kind){
+    const secs = kind === 'storm' ? 24 : 16;
+    const L = SR * secs, F = SR * 2, N = L + F;
     const x = new Float32Array(N);
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const TWO_PI = 2 * Math.PI;
+    const chirp = (start, f0, f1, dur, amp) => {
+      const n = Math.floor(dur * SR); let ph = 0;
+      for (let k = 0; k < n; k++){
+        const i = start + k; if (i >= N) break;
+        const t = k / n;
+        ph += TWO_PI * (f0 + (f1 - f0) * t) / SR;
+        const e = Math.sin(Math.PI * t);
+        x[i] += amp * e * e * Math.sin(ph);
+      }
+    };
+
     let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0, last=0, lp=0, lp2=0, hpY=0, prevLp=0, env=0;
+    let a1=0, a2=0, a3=0, m=0, m2=0;
+
     for (let i = 0; i < N; i++){
       const w = Math.random() * 2 - 1;
+      const t = i / SR;
       if (kind === 'white'){
         x[i] = w * 0.5;
       } else if (kind === 'pink'){
@@ -376,12 +404,81 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
       } else if (kind === 'sea'){
         lp += 0.05 * (w - lp);
         lp2 += 0.35 * (w - lp2);
-        const t = i / sr;
-        const swell = 0.5 + 0.5 * Math.sin(2 * Math.PI * t / 8 - 1.2);
+        const swell = 0.5 + 0.5 * Math.sin(TWO_PI * t / 8 - 1.2);
         const e = 0.25 + 0.75 * swell * swell;
         x[i] = lp * e * 3.2 + lp2 * e * e * 0.22;
+      } else if (kind === 'river'){
+        a1 += 0.35 * (w - a1);
+        a2 += 0.08 * (w - a2);
+        a3 += 0.7 * (w - a3);
+        m  += 0.0015 * ((Math.random() * 2 - 1) - m);
+        m2 += 0.01 * ((Math.random() * 2 - 1) - m2);
+        const flow = 0.8 + 8 * m + 0.2 * Math.sin(TWO_PI * 3 * t / 16);
+        const bub = 0.5 + 6 * m2;
+        x[i] = (a1 - a2) * 1.6 * flow + (w - a3) * 0.12 * bub;
+      } else if (kind === 'forest'){
+        lp += 0.02 * (w - lp);
+        x[i] = lp * (0.6 + 0.4 * Math.sin(TWO_PI * 3 * t / 16)) * 1.5;
+      } else if (kind === 'crickets'){
+        lp += 0.03 * (w - lp);
+        x[i] = lp * 0.25;
+      } else if (kind === 'storm'){
+        lp += 0.45 * (w - lp);
+        hpY = 0.97 * (hpY + lp - prevLp); prevLp = lp;
+        if (Math.random() < 0.0005) env = 0.3 + Math.random() * 0.5;
+        env *= 0.992;
+        lp2 += 0.01 * (w - lp2);
+        x[i] = hpY * 0.45 + env * w * 0.3 + lp2 * 1.2;
       }
     }
+
+    if (kind === 'forest'){
+      let t = rnd(0.2, 1.0);
+      while (t < secs + 2){
+        const s = Math.floor(t * SR);
+        const type = Math.floor(Math.random() * 3);
+        const base = rnd(2200, 4200), amp = rnd(0.12, 0.25);
+        if (type === 0){
+          chirp(s, base, base * 1.5, rnd(0.12, 0.22), amp);
+        } else if (type === 1){
+          const n = Math.floor(rnd(4, 9));
+          for (let k = 0; k < n; k++) chirp(s + Math.floor(k * 0.07 * SR), base, base * 1.2, 0.05, amp * 0.8);
+        } else {
+          chirp(s, base * 1.4, base, 0.14, amp);
+          chirp(s + Math.floor(0.22 * SR), base * 1.3, base * 0.9, 0.16, amp * 0.9);
+        }
+        t += rnd(0.8, 3.5);
+      }
+    }
+
+    if (kind === 'crickets'){
+      for (let c = 0; c < 4; c++){
+        const fc = rnd(3800, 5200), period = rnd(0.42, 0.7), amp = rnd(0.08, 0.14);
+        let tt = rnd(0, period);
+        while (tt < secs + 2){
+          for (let p = 0; p < 3; p++) chirp(Math.floor((tt + p * 0.055) * SR), fc, fc, 0.03, amp);
+          tt += period * rnd(0.97, 1.03);
+        }
+      }
+    }
+
+    if (kind === 'storm'){
+      const thunder = start => {
+        const dur = Math.floor(rnd(4, 6) * SR); let r = 0, r2 = 0;
+        for (let k = 0; k < dur; k++){
+          const i = start + k; if (i >= N) break;
+          const t = k / SR, w2 = Math.random() * 2 - 1;
+          r  += 0.04 * (w2 - r);
+          r2 += 0.4 * (w2 - r2);
+          const crack = t < 0.25 ? Math.exp(-t / 0.06) : 0;
+          const roll = Math.min(1, t / 0.35) * Math.exp(-t / 1.8) * (0.75 + 0.25 * Math.sin(TWO_PI * 5 * t));
+          x[i] += r * roll * 5 + r2 * crack * 1.2;
+        }
+      };
+      thunder(Math.floor(rnd(3, 7) * SR));
+      thunder(Math.floor(rnd(13, 19) * SR));
+    }
+
     // Bucle sin cortes: mezclar el final con el principio
     const out = new Float32Array(L);
     for (let i = 0; i < L; i++) out[i] = x[i];
@@ -392,61 +489,96 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     let peak = 0.0001, sq = 0;
     for (let i = 0; i < L; i++){ const v = Math.abs(out[i]); if (v > peak) peak = v; sq += out[i] * out[i]; }
     const rms = Math.sqrt(sq / L) || 0.0001;
-    const scale = Math.min(0.9 / peak, 0.12 / rms);
-    // WAV 16 bit mono
+    const scale = Math.min(0.9 / peak, (TARGET_RMS[kind] || 0.12) / rms);
+    for (let i = 0; i < L; i++) out[i] *= scale;
+    return out;
+  }
+
+  function wavUrl(out){
+    const L = out.length;
     const buf = new ArrayBuffer(44 + L * 2);
     const dv = new DataView(buf);
     const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
     wr(0, 'RIFF'); dv.setUint32(4, 36 + L * 2, true); wr(8, 'WAVE'); wr(12, 'fmt ');
     dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    dv.setUint32(24, SR, true); dv.setUint32(28, SR * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
     wr(36, 'data'); dv.setUint32(40, L * 2, true);
     for (let i = 0; i < L; i++){
-      const v = Math.max(-1, Math.min(1, out[i] * scale));
+      const v = Math.max(-1, Math.min(1, out[i]));
       dv.setInt16(44 + i * 2, v * 32767, true);
     }
     return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   }
 
-  function renderSounds(){
-    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.sound === currentSound));
+  function ensurePlayer(id){
+    if (!players[id]){
+      const a = new Audio(wavUrl(genSound(id)));
+      a.loop = true;
+      players[id] = a;
+    }
+    return players[id];
   }
 
-  function stopSound(){
-    try { player.pause(); } catch(e){}
-    currentSound = null;
-    renderSounds();
-    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
-  }
-
-  function playSound(kind){
-    if (currentSound === kind){ stopSound(); return; }
-    if (!soundUrls[kind]) soundUrls[kind] = makeWav(kind);
-    player.src = soundUrls[kind];
-    player.volume = volume;
-    player.play().catch(() => {});
-    currentSound = kind;
-    renderSounds();
+  function updateMix(){
+    let any = false;
+    SOUNDS.forEach(s => {
+      const lvl = mix[s.id] || 0;
+      if (lvl > 0 && !mixPaused){
+        const a = ensurePlayer(s.id);
+        a.volume = lvl * lvl;
+        if (a.paused) a.play().catch(() => {});
+        any = true;
+      } else if (players[s.id] && !players[s.id].paused){
+        players[s.id].pause();
+      }
+    });
     if ('mediaSession' in navigator){
       try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: SOUND_NAMES[kind], artist: 'Zenfoco',
-          artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }]
-        });
-        navigator.mediaSession.setActionHandler('pause', stopSound);
-        navigator.mediaSession.setActionHandler('stop', stopSound);
-        navigator.mediaSession.playbackState = 'playing';
+        if (any){
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Mezcla de sonidos', artist: 'Zenfoco',
+            artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }]
+          });
+          navigator.mediaSession.setActionHandler('pause', () => { mixPaused = true; updateMix(); });
+          navigator.mediaSession.setActionHandler('play', () => { mixPaused = false; updateMix(); });
+          navigator.mediaSession.playbackState = 'playing';
+        } else {
+          navigator.mediaSession.playbackState = mixPaused ? 'paused' : 'none';
+        }
       } catch(e){}
     }
   }
 
-  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => playSound(c.dataset.sound)));
-  const volEl = $('vol');
-  volEl.value = volume;
-  volEl.addEventListener('input', () => {
-    volume = parseFloat(volEl.value);
-    player.volume = volume;
-    store.set('zf_volume', volume);
+  function setSliders(){
+    SOUNDS.forEach(s => { $('mx-' + s.id).value = mix[s.id] || 0; });
+  }
+
+  const mixerEl = $('mixer');
+  SOUNDS.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'mrow';
+    row.innerHTML = '<label for="mx-' + s.id + '">' + s.icon + ' ' + s.name + '</label>' +
+      '<input type="range" id="mx-' + s.id + '" min="0" max="1" step="0.05" value="0">';
+    mixerEl.appendChild(row);
+    row.querySelector('input').addEventListener('input', e => {
+      mix[s.id] = parseFloat(e.target.value);
+      mixPaused = false;
+      updateMix();
+    });
+  });
+
+  const presetsEl = $('presets');
+  PRESETS.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = p.name;
+    b.addEventListener('click', () => {
+      mix = Object.assign({}, p.mix);
+      mixPaused = false;
+      setSliders();
+      updateMix();
+    });
+    presetsEl.appendChild(b);
   });
 
   applyTheme(); render(); renderStats();
