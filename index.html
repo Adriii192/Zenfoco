@@ -76,6 +76,8 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
 .mrow{display:grid;grid-template-columns:128px 1fr;align-items:center;gap:10px}
 .mrow label{font-size:.9rem}
 .mrow input{width:100%;accent-color:var(--accent)}
+.sleep{margin-top:18px}
+.sleep h3{margin:0 0 8px;font-size:.95rem}
 </style>
 </head>
 <body>
@@ -117,6 +119,11 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     <h2>🎧 Mezclador de sonidos</h2>
     <div class="chips" id="presets"></div>
     <div class="mixer" id="mixer"></div>
+    <div class="sleep">
+      <h3>⏱ Temporizador de apagado</h3>
+      <div class="chips" id="sleepChips"></div>
+      <p class="hint" id="sleepInfo"></p>
+    </div>
     <p class="hint">Sube varios deslizadores para mezclar sonidos a tu gusto.</p>
   </section>
 
@@ -341,6 +348,7 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
   const SOUNDS = [
     { id:'rain',     icon:'🌧️', name:'Lluvia' },
     { id:'storm',    icon:'⛈️', name:'Tormenta' },
+    { id:'fire',     icon:'🔥', name:'Fuego' },
     { id:'river',    icon:'💧', name:'Río' },
     { id:'sea',      icon:'🌊', name:'Mar' },
     { id:'forest',   icon:'🌲', name:'Bosque' },
@@ -354,13 +362,16 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     { name:'🌿 Naturaleza',    mix:{ river:.65, forest:.7 } },
     { name:'⛈️ Tormenta',      mix:{ storm:.8, rain:.35 } },
     { name:'🌙 Noche',         mix:{ crickets:.55, river:.5 } },
-    { name:'🔇 Apagar todo',   mix:{} }
+    { name:'🔥 Chimenea',      mix:{ fire:.75, rain:.2 } },
+    { name:'😴 Dormir',        mix:{ brown:.4, rain:.4, crickets:.2 }, timer:30 },
+    { name:'🔇 Apagar todo',   mix:{}, timer:0 }
   ];
   const SR = 22050;
-  const TARGET_RMS = { white:.12, pink:.12, brown:.12, rain:.12, sea:.12, river:.12, storm:.10, forest:.07, crickets:.05 };
+  const TARGET_RMS = { white:.12, pink:.12, brown:.12, rain:.12, sea:.12, river:.12, storm:.10, fire:.10, forest:.07, crickets:.05 };
   const players = {};
   let mix = {};
   let mixPaused = false;
+  let sleepFade = 1, sleepEnd = 0, sleepMin = 0, sleepTick = null;
 
   function genSound(kind){
     const secs = kind === 'storm' ? 24 : 16;
@@ -422,6 +433,12 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
       } else if (kind === 'crickets'){
         lp += 0.03 * (w - lp);
         x[i] = lp * 0.25;
+      } else if (kind === 'fire'){
+        lp  += 0.03 * (w - lp);
+        lp2 += 0.30 * (w - lp2);
+        m   += 0.002 * ((Math.random() * 2 - 1) - m);
+        m2  += 0.01  * ((Math.random() * 2 - 1) - m2);
+        x[i] = lp * (1.0 + 7 * m) * 1.4 + (w - lp2) * 0.03 * (0.5 + 5 * m2);
       } else if (kind === 'storm'){
         lp += 0.45 * (w - lp);
         hpY = 0.97 * (hpY + lp - prevLp); prevLp = lp;
@@ -459,6 +476,23 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
           for (let p = 0; p < 3; p++) chirp(Math.floor((tt + p * 0.055) * SR), fc, fc, 0.03, amp);
           tt += period * rnd(0.97, 1.03);
         }
+      }
+    }
+
+    if (kind === 'fire'){
+      const pop = (start, amp) => {
+        for (let k = 0; k < 260; k++){
+          const i = start + k; if (i >= N) break;
+          x[i] += amp * Math.exp(-k / 30) * (Math.random() * 2 - 1);
+        }
+      };
+      let t = rnd(0, 0.1);
+      while (t < secs + 2){ pop(Math.floor(t * SR), rnd(0.15, 0.6)); t += rnd(0.03, 0.4); }
+      let c = rnd(0.5, 2);
+      while (c < secs + 2){
+        const n = Math.floor(rnd(3, 8)); let tt = c;
+        for (let k = 0; k < n; k++){ pop(Math.floor(tt * SR), rnd(0.3, 0.9)); tt += rnd(0.004, 0.03); }
+        c += rnd(1, 3.5);
       }
     }
 
@@ -525,7 +559,7 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
       const lvl = mix[s.id] || 0;
       if (lvl > 0 && !mixPaused){
         const a = ensurePlayer(s.id);
-        a.volume = lvl * lvl;
+        a.volume = lvl * lvl * sleepFade;
         if (a.paused) a.play().catch(() => {});
         any = true;
       } else if (players[s.id] && !players[s.id].paused){
@@ -553,6 +587,52 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     SOUNDS.forEach(s => { $('mx-' + s.id).value = mix[s.id] || 0; });
   }
 
+  function applyVolumes(){
+    SOUNDS.forEach(s => {
+      const a = players[s.id];
+      const l = mix[s.id] || 0;
+      if (a && !a.paused) a.volume = l * l * sleepFade;
+    });
+  }
+
+  function renderSleep(){
+    document.querySelectorAll('#sleepChips .chip').forEach(c => c.classList.toggle('on', parseInt(c.dataset.min, 10) === sleepMin));
+    const info = $('sleepInfo');
+    if (sleepEnd > 0){
+      const r = Math.max(0, sleepEnd - Date.now());
+      const mm = Math.floor(r / 60000), ss = Math.floor((r % 60000) / 1000);
+      info.textContent = 'Los sonidos se apagarán en ' + mm + ':' + String(ss).padStart(2, '0') + ' con un fundido suave.';
+    } else {
+      info.textContent = 'Sin temporizador: los sonidos siguen hasta que los apagues.';
+    }
+  }
+
+  function sleepStep(){
+    const rem = sleepEnd - Date.now();
+    if (rem <= 0){
+      clearInterval(sleepTick); sleepTick = null;
+      sleepEnd = 0; sleepMin = 0; sleepFade = 1;
+      mix = {}; setSliders(); updateMix(); renderSleep();
+      return;
+    }
+    sleepFade = rem < 20000 ? rem / 20000 : 1;
+    applyVolumes(); renderSleep();
+  }
+
+  function setSleep(min){
+    clearInterval(sleepTick); sleepTick = null;
+    sleepFade = 1; sleepMin = min;
+    if (min > 0){
+      sleepEnd = Date.now() + min * 60000;
+      sleepTick = setInterval(sleepStep, 1000);
+    } else {
+      sleepEnd = 0;
+    }
+    applyVolumes(); renderSleep();
+  }
+
+  document.addEventListener('visibilitychange', () => { if (sleepEnd > 0) sleepStep(); });
+
   const mixerEl = $('mixer');
   SOUNDS.forEach(s => {
     const row = document.createElement('div');
@@ -577,9 +657,21 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
       mixPaused = false;
       setSliders();
       updateMix();
+      if (p.timer !== undefined) setSleep(p.timer);
     });
     presetsEl.appendChild(b);
   });
+
+  const sleepChips = $('sleepChips');
+  [[15, '15 min'], [30, '30 min'], [60, '1 h'], [90, '1,5 h'], [0, 'Sin']].forEach(([min, label]) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.min = min;
+    b.textContent = label;
+    b.addEventListener('click', () => setSleep(min));
+    sleepChips.appendChild(b);
+  });
+  renderSleep();
 
   applyTheme(); render(); renderStats();
 })();
