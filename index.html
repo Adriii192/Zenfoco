@@ -72,6 +72,46 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
 .vol{display:flex;align-items:center;gap:10px;margin-top:14px}
 .vol input{flex:1;accent-color:var(--accent)}
 .hint{color:var(--muted);font-size:.8rem;margin:10px 0 0}
+header .hl{display:flex;align-items:center;gap:10px;min-width:0}
+header h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page{display:none;flex-direction:column;align-items:center;gap:20px;width:100%}
+.page.active{display:flex}
+.page.entering{animation:pageIn .42s cubic-bezier(.2,.8,.2,1) both}
+.page.leaving{animation:pageOut .19s ease-in both}
+@keyframes pageIn{from{opacity:0;transform:translateX(var(--dx,28px)) scale(.985)}to{opacity:1;transform:none}}
+@keyframes pageOut{to{opacity:0;transform:translateX(var(--dx,-28px)) scale(.985)}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.page.entering,.page.leaving,.hcard,.mitem,.phrase{animation:none!important}}
+.hello{width:100%;padding:6px 4px 0}
+.hello h2{margin:0;font-size:1.6rem}
+.hello p{margin:4px 0 0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
+.hcard{background:var(--card);border:0;border-radius:20px;padding:16px 14px;text-align:left;color:var(--text);cursor:pointer;display:flex;flex-direction:column;gap:4px;min-height:118px;font-family:inherit;transition:transform .15s;animation:rise .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 70ms)}
+.hcard:active{transform:scale(.96)}
+.hcard .hi{font-size:1.9rem;line-height:1.1}
+.hcard b{font-size:1.05rem}
+.hcard small{color:var(--muted);font-size:.82rem}
+.hcard.wide{grid-column:1/-1;min-height:96px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff}
+.hcard.wide small{color:rgba(255,255,255,.88)}
+.medlist{display:flex;flex-direction:column;gap:10px;width:100%}
+.mitem{width:100%;text-align:left;background:var(--card);border:0;border-radius:16px;padding:14px 16px;color:var(--text);cursor:pointer;display:flex;flex-direction:column;gap:3px;font-family:inherit;animation:rise .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0) * 55ms)}
+.mitem:active{transform:scale(.98)}
+.mitem b{font-size:1rem}
+.mitem span{color:var(--muted);font-size:.85rem}
+.mitem em{font-style:normal;color:var(--accent-dark);font-size:.78rem;font-weight:700}
+.orbwrap{position:relative;width:min(72vw,280px);aspect-ratio:1;display:grid;place-items:center;margin:8px 0}
+.orb{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--accent),var(--accent-dark));box-shadow:0 0 60px color-mix(in srgb,var(--accent) 45%,transparent);transform:scale(.5);transition:transform 4s ease-in-out}
+.orbtxt{position:relative;text-align:center;color:var(--text);z-index:1;pointer-events:none}
+.orbtxt .bl{font-size:1.3rem;font-weight:700}
+.orbtxt .bc{font-size:2.4rem;font-weight:700;font-variant-numeric:tabular-nums}
+.player{width:100%;display:flex;flex-direction:column;align-items:center;gap:18px}
+.player h2{margin:0;font-size:1.2rem;text-align:center}
+.phrase{min-height:150px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:1.25rem;line-height:1.5;padding:0 6px;animation:phraseIn .9s ease both}
+@keyframes phraseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.bar{width:100%;height:6px;border-radius:99px;background:var(--ring-bg);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .6s ease}
+.player .row{width:100%;background:var(--card);border-radius:16px;padding:12px 16px;margin:0}
+.player .sounds h3{margin:0 0 10px;font-size:.95rem}
 .mixer{margin-top:14px;display:flex;flex-direction:column;gap:10px}
 .mrow{display:grid;grid-template-columns:128px 1fr;align-items:center;gap:10px}
 .mrow label{font-size:.9rem}
@@ -82,11 +122,31 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
 </head>
 <body>
 <header>
-  <h1>🌤️ Zenfoco</h1>
+  <div class="hl">
+    <button class="icon-btn" id="back" aria-label="Volver" style="display:none">←</button>
+    <h1 id="title">🌤️ Zenfoco</h1>
+  </div>
   <button class="icon-btn" id="openSettings" aria-label="Ajustes">⚙️</button>
 </header>
 <main>
-  <div class="modes" role="tablist">
+  <section class="page active" id="page-home">
+    <div class="hello">
+      <h2 id="helloTitle">Hola</h2>
+      <p id="helloSub">¿Qué necesitas ahora?</p>
+    </div>
+    <div class="grid">
+      <button class="hcard wide" data-go="focus" style="--i:0"><span class="hi">🎯</span><b>Enfoque</b><small id="homeStats">Pomodoro y estadísticas</small></button>
+      <button class="hcard" data-go="sounds" style="--i:1"><span class="hi">🎧</span><b>Sonidos</b><small>Crea tu ambiente</small></button>
+      <button class="hcard" data-go="breathe" style="--i:2"><span class="hi">🌬️</span><b>Respirar</b><small>Calma en un minuto</small></button>
+      <button class="hcard" data-go="meditate" data-cat="Meditación" style="--i:3"><span class="hi">🧘</span><b>Meditar</b><small>Guiada con voz</small></button>
+      <button class="hcard" data-go="meditate" data-cat="Mindfulness" style="--i:4"><span class="hi">🌿</span><b>Mindfulness</b><small>Atención plena</small></button>
+      <button class="hcard wide" data-go="meditate" data-cat="Sueño" style="--i:5"><span class="hi">🌙</span><b>Dormir</b><small>Relajación para conciliar el sueño</small></button>
+    </div>
+    <button class="btn secondary" id="install">📲 Instalar Zenfoco</button>
+  </section>
+
+  <section class="page" id="page-focus">
+    <div class="modes" role="tablist">
     <button data-mode="focus" class="active">Enfoque</button>
     <button data-mode="short">Descanso</button>
     <button data-mode="long">Descanso largo</button>
@@ -114,8 +174,10 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     <div><b id="statMinutes">0</b><span>Minutos</span></div>
     <div><b id="statStreak">0</b><span>Racha (días)</span></div>
   </div>
+  </section>
 
-  <section class="sounds">
+  <section class="page" id="page-sounds">
+    <section class="sounds">
     <h2>🎧 Mezclador de sonidos</h2>
     <div class="chips" id="presets"></div>
     <div class="mixer" id="mixer"></div>
@@ -126,8 +188,41 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     </div>
     <p class="hint">Sube varios deslizadores para mezclar sonidos a tu gusto.</p>
   </section>
+  </section>
 
-  <button class="btn secondary" id="install">📲 Instalar Zenfoco</button>
+  <section class="page" id="page-breathe">
+    <div class="orbwrap">
+      <div class="orb" id="orb"></div>
+      <div class="orbtxt"><div class="bl" id="breathLabel">Listo</div><div class="bc" id="breathCount"></div></div>
+    </div>
+    <div class="chips" id="breathChips"></div>
+    <button class="btn" id="breathBtn">Empezar</button>
+    <p class="hint" id="breathInfo">Sigue el círculo: inhala cuando crece, exhala cuando se encoge.</p>
+  </section>
+
+  <section class="page" id="page-meditate">
+    <div class="chips" id="medCats"></div>
+    <div class="medlist" id="medList"></div>
+    <p class="hint">La voz es la del propio móvil, así que funciona sin conexión.</p>
+  </section>
+
+  <section class="page" id="page-player">
+    <div class="player">
+      <h2 id="plTitle"></h2>
+      <div class="phrase" id="plPhrase">Pulsa Empezar cuando estés listo.</div>
+      <div class="bar"><i id="plBar"></i></div>
+      <div class="controls">
+        <button class="btn secondary" id="plReset" aria-label="Reiniciar">↺</button>
+        <button class="btn" id="plPlay">Empezar</button>
+      </div>
+      <div class="row"><label for="plVoice">🔊 Voz guiada</label><input type="checkbox" id="plVoice"></div>
+      <section class="sounds" style="width:100%">
+        <h3>🎧 Sonido de fondo</h3>
+        <div class="chips" id="plBg"></div>
+      </section>
+      <p class="hint" id="plHint"></p>
+    </div>
+  </section>
 </main>
 
 <dialog id="settings">
@@ -672,6 +767,373 @@ dialog h2{margin:0 0 14px;font-size:1.15rem}
     sleepChips.appendChild(b);
   });
   renderSleep();
+
+  // ---------- Calma (minutos) ----------
+  let calm = store.get('zf_calm', {});
+  function addCalm(min){
+    if (!(min > 0.05)) return;
+    const k = dayKey();
+    calm[k] = (calm[k] || 0) + min;
+    store.set('zf_calm', calm);
+  }
+
+  const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---------- Respiración guiada ----------
+  const PATTERNS = [
+    { id:'box',  name:'Caja 4-4-4-4', steps:[['Inhala',4],['Mantén',4],['Exhala',4],['Mantén',4]] },
+    { id:'478',  name:'Relax 4-7-8',  steps:[['Inhala',4],['Mantén',7],['Exhala',8]] },
+    { id:'calm', name:'Calma 5-5',    steps:[['Inhala',5],['Exhala',5]] }
+  ];
+  let pattern = PATTERNS[0], breathRun = false, breathTok = 0, breathStart = 0, breathCycles = 0;
+  const orb = $('orb');
+
+  function renderBreathUI(){
+    $('breathBtn').textContent = breathRun ? 'Terminar' : 'Empezar';
+    document.querySelectorAll('#breathChips .chip').forEach(c => c.classList.toggle('on', c.dataset.id === pattern.id));
+  }
+
+  async function runBreath(){
+    const tok = ++breathTok;
+    breathRun = true; breathStart = Date.now(); breathCycles = 0;
+    $('breathInfo').textContent = 'Sigue el círculo. Puedes cerrar los ojos y guiarte por la vibración.';
+    renderBreathUI();
+    while (tok === breathTok){
+      for (const [label, sec] of pattern.steps){
+        if (tok !== breathTok) return;
+        $('breathLabel').textContent = label;
+        if (label === 'Inhala'){ orb.style.transitionDuration = sec + 's'; orb.style.transform = 'scale(1)'; }
+        else if (label === 'Exhala'){ orb.style.transitionDuration = sec + 's'; orb.style.transform = 'scale(.5)'; }
+        try { if (navigator.vibrate) navigator.vibrate(25); } catch(e){}
+        for (let n = sec; n > 0; n--){
+          $('breathCount').textContent = n;
+          await sleepMs(1000);
+          if (tok !== breathTok) return;
+        }
+      }
+      breathCycles++;
+      $('breathInfo').textContent = breathCycles + (breathCycles === 1 ? ' ciclo completado' : ' ciclos completados');
+    }
+  }
+
+  function stopBreath(){
+    if (!breathRun) return;
+    breathTok++; breathRun = false;
+    addCalm((Date.now() - breathStart) / 60000);
+    orb.style.transitionDuration = '1s'; orb.style.transform = 'scale(.5)';
+    $('breathLabel').textContent = 'Listo'; $('breathCount').textContent = '';
+    $('breathInfo').textContent = breathCycles > 0 ? 'Bien hecho: ' + breathCycles + ' ciclos.' : 'Sigue el círculo: inhala cuando crece, exhala cuando se encoge.';
+    renderBreathUI();
+  }
+
+  PATTERNS.forEach(pt => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.id = pt.id; b.textContent = pt.name;
+    b.addEventListener('click', () => {
+      const was = breathRun;
+      if (was) stopBreath();
+      pattern = pt; renderBreathUI();
+      if (was) runBreath();
+    });
+    $('breathChips').appendChild(b);
+  });
+  $('breathBtn').addEventListener('click', () => { if (breathRun) stopBreath(); else runBreath(); });
+  renderBreathUI();
+
+  // ---------- Meditaciones y mindfulness (voz del dispositivo) ----------
+  const MEDITATIONS = [
+    { id:'resp', cat:'Meditación', title:'Atención a la respiración', desc:'Ancla tu mente en el aire que entra y sale.', steps:[
+      ["Bienvenido. Busca una postura cómoda, con la espalda erguida y los hombros sueltos.", 5],
+      ["Si quieres, cierra los ojos, o deja la mirada suave, apoyada en un punto cualquiera.", 5],
+      ["Respira con naturalidad, sin cambiar nada. Solo observa cómo entra y sale el aire.", 8],
+      ["Fíjate en dónde sientes más la respiración: en la nariz, en el pecho o en el abdomen.", 10],
+      ["Acompaña con tu atención cada inhalación, desde que empieza hasta que termina.", 10],
+      ["Y cada exhalación, hasta que se vacía por completo.", 10],
+      ["Es normal que la mente se distraiga. Cuando te des cuenta, vuelve a la respiración, sin juzgarte.", 12],
+      ["Cada vez que vuelves, estás entrenando tu atención.", 12],
+      ["Cuenta mentalmente cada exhalación, de uno a diez. Si pierdes la cuenta, empieza otra vez en uno.", 25],
+      ["Suelta la cuenta y descansa en la respiración durante unos instantes.", 20],
+      ["Poco a poco, nota tu cuerpo sentado, el contacto con la silla y con el suelo.", 6],
+      ["Cuando estés listo, abre los ojos despacio. Gracias por dedicarte este momento.", 3]
+    ]},
+    { id:'cuerpo', cat:'Meditación', title:'Escáner corporal', desc:'Recorre el cuerpo de los pies a la cabeza y suelta la tensión.', steps:[
+      ["Bienvenido a este escáner corporal. Ponte cómodo, sentado o tumbado, y deja que el cuerpo se apoye por completo.", 6],
+      ["Cierra los ojos si te apetece. Respira hondo por la nariz, y suelta el aire despacio por la boca.", 8],
+      ["Lleva tu atención a los pies. Nota el contacto con el suelo o la superficie, el calor, el cosquilleo. Si hay tensión, deja que se afloje al exhalar.", 18],
+      ["Sube la atención por las piernas: gemelos, rodillas, muslos. No hace falta cambiar nada, solo sentir.", 18],
+      ["Siente la zona de las caderas y la parte baja de la espalda. Suelta cualquier esfuerzo que no necesites.", 18],
+      ["Lleva la atención al abdomen. Nota cómo sube y baja con cada respiración.", 16],
+      ["Ahora el pecho y la espalda alta. Deja que el pecho se ablande con cada exhalación.", 16],
+      ["Atiende a las manos y los brazos, hasta los hombros. Deja que los hombros caigan, lejos de las orejas.", 18],
+      ["Siente el cuello y la garganta. Suelta la mandíbula, y deja que los dientes se separen un poco.", 16],
+      ["Relaja la cara: la frente, los ojos, las mejillas. Quizá aparezca una media sonrisa.", 16],
+      ["Ahora abarca todo el cuerpo a la vez, como un solo espacio que respira.", 20],
+      ["Quédate unos instantes así, sin hacer nada más.", 20],
+      ["Poco a poco, mueve los dedos de las manos y de los pies. Respira hondo, y cuando quieras, abre los ojos. Gracias por este momento.", 4]
+    ]},
+    { id:'estres', cat:'Meditación', title:'Soltar el estrés del día', desc:'Descarga la tensión acumulada y reconoce lo que has hecho hoy.', steps:[
+      ["Vamos a soltar el día. Siéntate cómodo y respira hondo un par de veces.", 8],
+      ["Nota dónde guardas hoy la tensión: hombros, mandíbula, estómago. Solo obsérvalo, sin juzgar.", 14],
+      ["Inhala llevando el aire a esa zona, y al exhalar imagina que la tensión sale con el aire.", 20],
+      ["Otra vez, inhala despacio, y exhala soltando un poco más.", 18],
+      ["Piensa en algo que hayas hecho hoy, por pequeño que sea, y reconócelo. Lo has hecho lo mejor que has podido.", 16],
+      ["Ahora piensa en algo que no depende de ti, y dale permiso para esperar hasta mañana.", 16],
+      ["Respira. Con cada exhalación, suelta un poco más.", 20],
+      ["Lleva una mano al pecho y siente tu latido, tranquilo y constante.", 15],
+      ["Repite mentalmente: estoy a salvo, estoy aquí, es suficiente.", 20],
+      ["Cuando quieras, abre los ojos y vuelve despacio. Gracias por cuidarte.", 3]
+    ]},
+    { id:'sentidos', cat:'Mindfulness', title:'Cinco sentidos (5-4-3-2-1)', desc:'Vuelve al presente usando lo que ves, tocas y oyes.', steps:[
+      ["Esta práctica te ancla al presente usando tus sentidos. Respira hondo una vez.", 4],
+      ["Mira a tu alrededor y nombra mentalmente cinco cosas que puedas ver. Tómate tu tiempo.", 18],
+      ["Ahora, cuatro cosas que puedas tocar o sentir: la ropa en tu piel, la superficie bajo tus manos.", 16],
+      ["Tres sonidos que puedas escuchar, cercanos o lejanos.", 14],
+      ["Dos olores que puedas notar. Si no hay ninguno, imagina tus dos olores favoritos.", 12],
+      ["Un sabor, el que haya ahora mismo en tu boca.", 8],
+      ["Respira hondo y nota cómo estás ahora, aquí.", 6],
+      ["Cuando quieras, sigue con tu día llevando esta atención contigo.", 2]
+    ]},
+    { id:'pausa', cat:'Mindfulness', title:'Pausa de un minuto', desc:'Un respiro rápido entre tareas.', steps:[
+      ["Detente un momento. Deja lo que estás haciendo.", 3],
+      ["Apoya los pies en el suelo y nota su contacto.", 6],
+      ["Inhala profundo por la nariz, y suelta el aire despacio por la boca.", 8],
+      ["Otra vez, inhala, y exhala soltando la tensión de los hombros.", 8],
+      ["Pregúntate: ¿cómo me siento ahora mismo? No hace falta cambiarlo, solo notarlo.", 10],
+      ["Vuelve a lo que estabas haciendo con una atención más amable.", 2]
+    ]},
+    { id:'gratitud', cat:'Mindfulness', title:'Gratitud breve', desc:'Termina el día o empieza uno nuevo con buen pie.', steps:[
+      ["Siéntate cómodo y respira hondo. Vamos a dedicar unos minutos a la gratitud.", 6],
+      ["Piensa en una persona que te haya hecho bien. Recuerda su cara y cómo te hace sentir.", 18],
+      ["Agradécelo en silencio, con una frase sencilla: gracias.", 14],
+      ["Ahora piensa en algo de tu cuerpo que te funciona bien, aunque lo des por hecho.", 16],
+      ["Piensa en un pequeño placer de hoy: un café, el sol, una canción.", 16],
+      ["Nota cómo se siente el cuerpo cuando agradeces: quizá el pecho, quizá el rostro.", 16],
+      ["Respira hondo, llevándote esta sensación contigo.", 8],
+      ["Abre los ojos cuando quieras. Que la gratitud te acompañe el resto del día.", 3]
+    ]},
+    { id:'dormir', cat:'Sueño', title:'Relajación para dormir', desc:'Relajación progresiva y visualización para conciliar el sueño.', steps:[
+      ["Es hora de descansar. Apaga las pantallas si puedes, acomódate en la cama y deja que el colchón sostenga tu peso.", 8],
+      ["Respira por la nariz contando hasta cuatro, y suelta el aire despacio contando hasta seis. Repítelo a tu ritmo.", 20],
+      ["Con cada exhalación, imagina que el cuerpo se hace un poco más pesado y se hunde en la cama.", 16],
+      ["Afloja los pies y los tobillos. Siente cómo se vuelven pesados y cálidos.", 16],
+      ["Las piernas se aflojan, de las rodillas a las caderas. Todo el peso descansa.", 16],
+      ["El vientre se suaviza. La espalda se apoya, vértebra a vértebra.", 16],
+      ["Los hombros se hunden. Los brazos y las manos quedan flojos, como si no te pertenecieran.", 16],
+      ["El cuello se suelta. La mandíbula, floja. Los ojos, pesados y tranquilos.", 18],
+      ["Si aparecen pensamientos, déjalos pasar como nubes. No tienes que seguirlos. Ahora solo toca descansar.", 20],
+      ["Imagina un lugar donde te sientas seguro: una playa en calma, un bosque, una habitación cálida. Mira los detalles, los colores, los sonidos.", 30],
+      ["Con cada respiración, te vas hundiendo un poco más en la calma.", 30],
+      ["Cuenta hacia atrás desde diez, una cifra por exhalación. Si te pierdes, no pasa nada, es buena señal.", 40],
+      ["Ahora ya no hace falta hacer nada. Deja que el sueño llegue cuando tenga que llegar. Buenas noches.", 10]
+    ]}
+  ];
+
+  const estMs = text => Math.max(2500, text.split(/\s+/).length * 430);
+  const medMinutes = m => Math.max(1, Math.round(m.steps.reduce((t, st) => t + st[1] + estMs(st[0]) / 1000, 0) / 60));
+
+  let med = null, medIdx = 0, medRun = false, medTok = 0, medWake = null;
+  let useVoice = store.get('zf_voice', true);
+  const hasTTS = 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  if (!hasTTS) useVoice = false;
+
+  let esVoice = null;
+  function pickVoice(){
+    if (esVoice) return esVoice;
+    try {
+      const vs = speechSynthesis.getVoices();
+      esVoice = vs.find(v => v.lang === 'es-ES') || vs.find(v => (v.lang || '').toLowerCase().startsWith('es')) || null;
+    } catch(e){}
+    return esVoice;
+  }
+  if (hasTTS){ try { speechSynthesis.addEventListener('voiceschanged', () => { esVoice = null; pickVoice(); }); } catch(e){} }
+
+  function speak(text){
+    return new Promise(resolve => {
+      if (!useVoice || !hasTTS){ setTimeout(resolve, estMs(text)); return; }
+      let done = false, to = null;
+      const fin = () => { if (!done){ done = true; clearTimeout(to); resolve(); } };
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'es-ES'; u.rate = 0.82; u.pitch = 0.95;
+        const v = pickVoice(); if (v) u.voice = v;
+        u.onend = fin; u.onerror = fin;
+        to = setTimeout(fin, estMs(text) * 2 + 6000);
+        speechSynthesis.speak(u);
+      } catch(e){ setTimeout(fin, estMs(text)); }
+    });
+  }
+
+  function showPhrase(t){
+    const el = $('plPhrase');
+    el.textContent = t;
+    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  }
+  function medUI(){
+    const total = med ? med.steps.length : 1;
+    $('plBar').style.width = Math.min(100, Math.round(medIdx / total * 100)) + '%';
+    $('plPlay').textContent = medRun ? 'Pausar' : (medIdx > 0 && medIdx < total ? 'Seguir' : 'Empezar');
+  }
+  async function medWakeOn(){ try { if ('wakeLock' in navigator) medWake = await navigator.wakeLock.request('screen'); } catch(e){} }
+  function medWakeOff(){ try { if (medWake){ medWake.release(); medWake = null; } } catch(e){} }
+
+  async function runMed(){
+    const tok = ++medTok;
+    medRun = true; medUI(); medWakeOn();
+    while (medIdx < med.steps.length){
+      if (tok !== medTok) return;
+      const [text, pause] = med.steps[medIdx];
+      showPhrase(text);
+      await speak(text);
+      if (tok !== medTok) return;
+      await sleepMs(pause * 1000);
+      if (tok !== medTok) return;
+      medIdx++; medUI();
+    }
+    if (tok === medTok){
+      medRun = false; medWakeOff();
+      addCalm(medMinutes(med));
+      showPhrase('Has terminado. Gracias por tomarte este momento. 🌿');
+      medUI();
+    }
+  }
+  function stopMed(){
+    medTok++; medRun = false; medWakeOff();
+    try { if (hasTTS) speechSynthesis.cancel(); } catch(e){}
+  }
+  function pauseMed(){ stopMed(); medUI(); }
+
+  $('plPlay').addEventListener('click', () => {
+    if (!med) return;
+    if (medRun){ pauseMed(); return; }
+    if (medIdx >= med.steps.length) medIdx = 0;
+    runMed();
+  });
+  $('plReset').addEventListener('click', () => {
+    stopMed(); medIdx = 0;
+    if (med) showPhrase('Pulsa Empezar cuando estés listo.');
+    medUI();
+  });
+  $('plVoice').checked = useVoice;
+  $('plVoice').disabled = !hasTTS;
+  $('plVoice').addEventListener('change', e => {
+    useVoice = e.target.checked && hasTTS;
+    store.set('zf_voice', useVoice);
+    if (medRun){ stopMed(); runMed(); }
+    renderPlHint();
+  });
+  function renderPlHint(){
+    $('plHint').textContent = !hasTTS
+      ? 'Este navegador no tiene voz: se mostrará solo el texto.'
+      : (useVoice ? 'La pantalla se queda encendida durante la meditación.' : 'Voz desactivada: se mostrará solo el texto.');
+  }
+
+  const BG = [
+    ['Sin fondo', {}], ['🌧️ Lluvia', { rain:.35 }], ['💧 Río', { river:.4 }],
+    ['🌲 Bosque', { forest:.5, river:.2 }], ['🟤 Marrón', { brown:.4 }], ['🔥 Fuego', { fire:.4 }]
+  ];
+  BG.forEach(([name, m]) => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = name;
+    b.addEventListener('click', () => {
+      mix = Object.assign({}, m); mixPaused = false; setSliders(); updateMix();
+      document.querySelectorAll('#plBg .chip').forEach(c => c.classList.toggle('on', c === b));
+    });
+    $('plBg').appendChild(b);
+  });
+
+  let medCat = 'Todas';
+  function renderMedList(){
+    document.querySelectorAll('#medCats .chip').forEach(c => c.classList.toggle('on', c.dataset.cat === medCat));
+    const list = $('medList');
+    list.innerHTML = '';
+    MEDITATIONS.filter(m => medCat === 'Todas' || m.cat === medCat).forEach((m, i) => {
+      const b = document.createElement('button');
+      b.className = 'mitem'; b.style.setProperty('--i', i);
+      b.innerHTML = '<em>' + m.cat + ' · ~' + medMinutes(m) + ' min</em><b></b><span></span>';
+      b.querySelector('b').textContent = m.title;
+      b.querySelector('span').textContent = m.desc;
+      b.addEventListener('click', () => openMed(m.id));
+      list.appendChild(b);
+    });
+  }
+  ['Todas', 'Meditación', 'Mindfulness', 'Sueño'].forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.dataset.cat = c; b.textContent = c;
+    b.addEventListener('click', () => { medCat = c; renderMedList(); });
+    $('medCats').appendChild(b);
+  });
+
+  function openMed(id){
+    med = MEDITATIONS.find(m => m.id === id);
+    medIdx = 0; stopMed();
+    $('plTitle').textContent = med.title;
+    $('plPhrase').textContent = 'Pulsa Empezar cuando estés listo.';
+    renderPlHint(); medUI();
+    go('player');
+  }
+
+  // ---------- Navegación con transiciones ----------
+  const TITLES = { focus:'Enfoque', sounds:'Sonidos', breathe:'Respirar', meditate:'Meditar', player:'Meditación' };
+  let page = 'home', navTimer = null;
+  const reduceMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){ return false; } };
+
+  function updateHeader(){
+    $('back').style.display = page === 'home' ? 'none' : '';
+    $('title').textContent = page === 'home' ? '🌤️ Zenfoco' : (page === 'meditate' && medCat !== 'Todas' ? medCat : TITLES[page]);
+  }
+
+  function updateHome(){
+    renderStats();
+    const h = new Date().getHours();
+    $('helloTitle').textContent = h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
+    const t = stats.days[dayKey()] || { n:0 };
+    const c = Math.round(calm[dayKey()] || 0);
+    const streak = $('statStreak').textContent;
+    $('homeStats').textContent = (t.n || c || streak !== '0')
+      ? 'Hoy: ' + t.n + ' sesiones · ' + c + ' min de calma · racha ' + streak
+      : 'Pomodoro y estadísticas';
+  }
+
+  function go(name, opts){
+    opts = opts || {};
+    if (name === page) return;
+    const prev = page;
+    page = name;
+    if (prev === 'player') stopMed();
+    if (prev === 'breathe') stopBreath();
+    if (opts.push !== false){ try { history.pushState({ p:name }, ''); } catch(e){} }
+    updateHeader();
+    clearTimeout(navTimer);
+    const back = !!opts.back;
+    const show = () => {
+      document.querySelectorAll('.page').forEach(el => el.classList.remove('active', 'leaving', 'entering'));
+      const to = $('page-' + name);
+      to.style.setProperty('--dx', back ? '-28px' : '28px');
+      to.classList.add('active');
+      if (!reduceMotion()){ to.classList.add('entering'); setTimeout(() => to.classList.remove('entering'), 500); }
+      window.scrollTo(0, 0);
+      if (name === 'home') updateHome();
+      if (name === 'meditate') renderMedList();
+    };
+    const out = document.querySelector('.page.active');
+    if (out && !reduceMotion()){
+      out.style.setProperty('--dx', back ? '28px' : '-28px');
+      out.classList.add('leaving');
+      navTimer = setTimeout(show, 190);
+    } else show();
+  }
+
+  document.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => {
+    if (el.dataset.cat) medCat = el.dataset.cat;
+    go(el.dataset.go);
+  }));
+  $('back').addEventListener('click', () => {
+    if (history.state && history.state.p && history.state.p !== 'home'){ history.back(); }
+    else go(page === 'player' ? 'meditate' : 'home', { back:true, push:false });
+  });
+  window.addEventListener('popstate', e => go((e.state && e.state.p) || 'home', { back:true, push:false }));
+  try { history.replaceState({ p:'home' }, ''); } catch(e){}
+  updateHome();
 
   applyTheme(); render(); renderStats();
 })();
